@@ -180,8 +180,8 @@
       statusBox.textContent = "Sedang memuat model AI...";
 
       model = await tmImage.load(
-        "./model.json",
-        "./metadata.json"
+        "./model/model.json",
+        "./model/metadata.json"
       );
 
       statusBox.textContent =
