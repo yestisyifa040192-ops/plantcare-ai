@@ -1,0 +1,10 @@
+{
+  "name": "PlantCare AI",
+  "short_name": "PlantCare",
+  "description": "Identifikasi kondisi daun tanaman dengan AI",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#edf5f0",
+  "theme_color": "#367d68"
+}

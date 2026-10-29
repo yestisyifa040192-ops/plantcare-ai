@@ -1,0 +1,292 @@
+
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#367d68">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="PlantCare AI">
+  <title>PlantCare AI</title>
+
+  <link rel="manifest" href="./manifest.json">
+
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      padding: 24px 14px;
+      background: #edf5f0;
+      color: #263b31;
+      font-family: Arial, sans-serif;
+    }
+
+    main {
+      max-width: 540px;
+      margin: 20px auto;
+      padding: 25px 20px;
+      background: white;
+      border-radius: 22px;
+      box-shadow: 0 8px 28px #173e2914;
+    }
+
+    header { text-align: center; }
+
+    h1 {
+      margin: 0 0 10px;
+      color: #367d68;
+      font-size: 29px;
+    }
+
+    .subtitle {
+      color: #63746b;
+      line-height: 1.5;
+    }
+
+    .plant-icon { font-size: 44px; }
+
+    .picker {
+      display: block;
+      width: 100%;
+      margin: 22px 0 15px;
+      padding: 12px;
+      border: 1px solid #d5e4da;
+      border-radius: 10px;
+      background: #f8fbf8;
+    }
+
+    #preview {
+      display: none;
+      width: 100%;
+      max-height: 340px;
+      object-fit: contain;
+      margin: 12px 0;
+      border-radius: 12px;
+      background: #f2f5f2;
+    }
+
+    button {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 10px;
+      background: #367d68;
+      color: white;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      background: #9eafa6;
+      cursor: not-allowed;
+    }
+
+    .panel {
+      margin-top: 14px;
+      padding: 14px;
+      border-radius: 10px;
+      background: #f1f6f2;
+      line-height: 1.6;
+      overflow-wrap: anywhere;
+    }
+
+    .panel h2 {
+      margin: 0 0 8px;
+      font-size: 17px;
+    }
+
+    #status { font-size: 14px; }
+
+    .small {
+      margin-top: 20px;
+      text-align: center;
+      color: #718078;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+  </style>
+
+  <!-- Kedua pustaka harus tersedia secara lokal untuk penggunaan offline -->
+  <script src="./libs/tf.min.js"></script>
+  <script src="./libs/teachablemachine-image.min.js"></script>
+</head>
+
+<body>
+<main>
+  <header>
+    <div class="plant-icon">🌱</div>
+    <h1>PlantCare AI</h1>
+    <div class="subtitle">
+      Asisten Identifikasi Kondisi Daun Tanaman
+    </div>
+    <p>Pilih foto daun untuk dianalisis oleh AI.</p>
+  </header>
+
+  <input
+    id="photo"
+    class="picker"
+    type="file"
+    accept="image/*"
+    aria-label="Pilih foto daun"
+  >
+
+  <img id="preview" alt="Foto daun yang dipilih">
+
+  <button id="analyze" disabled>Memuat model AI...</button>
+
+  <div class="panel" id="status" role="status">
+    Menyiapkan model AI...
+  </div>
+
+  <div class="panel">
+    <h2>Hasil Identifikasi</h2>
+    <div id="result">Hasil identifikasi akan muncul di sini.</div>
+  </div>
+
+  <div class="panel">
+    <h2>Saran Perawatan</h2>
+    <div id="advice">Saran perawatan akan muncul di sini.</div>
+  </div>
+
+  <p class="small">
+    Hasil merupakan prediksi visual dari model AI, bukan diagnosis
+    pasti penyakit tanaman. Periksa kondisi tanaman secara langsung.
+  </p>
+</main>
+
+<script>
+  const photo = document.getElementById("photo");
+  const preview = document.getElementById("preview");
+  const analyze = document.getElementById("analyze");
+  const statusBox = document.getElementById("status");
+  const resultBox = document.getElementById("result");
+  const adviceBox = document.getElementById("advice");
+
+  let model = null;
+  let selectedImage = false;
+  let imageUrl = null;
+
+  async function loadModel() {
+    try {
+      if (typeof tf === "undefined" ||
+          typeof tmImage === "undefined") {
+        throw new Error(
+          "Pustaka AI belum tersedia. Periksa folder libs."
+        );
+      }
+
+      statusBox.textContent = "Sedang memuat model AI...";
+
+      model = await tmImage.load(
+        "./model.json",
+        "./metadata.json"
+      );
+
+      statusBox.textContent =
+        "Model AI berhasil dimuat. Silakan pilih foto daun.";
+
+      analyze.disabled = !selectedImage;
+      analyze.textContent = "Analisis Daun";
+
+    } catch (error) {
+      console.error(error);
+      statusBox.textContent =
+        "Model gagal dimuat. Periksa file model dan pustaka AI.";
+      analyze.disabled = true;
+    }
+  }
+
+  photo.addEventListener("change", function () {
+    const file = photo.files[0];
+
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      statusBox.textContent = "Pilih file gambar yang valid.";
+      return;
+    }
+
+    if (imageUrl) URL.revokeObjectURL(imageUrl);
+    imageUrl = URL.createObjectURL(file);
+
+    preview.onload = function () {
+      selectedImage = true;
+      analyze.disabled = !model;
+      statusBox.textContent = model
+        ? "Foto siap dianalisis."
+        : "Foto dipilih. Menunggu model AI...";
+    };
+
+    preview.onerror = function () {
+      statusBox.textContent = "Foto tidak dapat dibuka.";
+    };
+
+    preview.src = imageUrl;
+    preview.style.display = "block";
+
+    resultBox.textContent = "Belum dianalisis.";
+    adviceBox.textContent = "Saran akan muncul setelah analisis.";
+  });
+
+  analyze.addEventListener("click", async function () {
+    if (!model || !selectedImage) return;
+
+    analyze.disabled = true;
+    analyze.textContent = "Menganalisis...";
+    statusBox.textContent = "AI sedang memeriksa foto daun...";
+
+    try {
+      const predictions = await model.predict(preview);
+      predictions.sort((a, b) => b.probability - a.probability);
+
+      const best = predictions[0];
+      const confidence = (best.probability * 100).toFixed(1);
+
+      resultBox.textContent =
+        best.className + " — keyakinan model " + confidence + "%.";
+
+      const label = best.className.toLowerCase();
+      const healthy =
+        label.includes("sehat") ||
+        label.includes("healthy");
+
+      if (healthy) {
+        adviceBox.textContent =
+          "Daun diprediksi sehat. Pertahankan penyiraman " +
+          "secukupnya, cahaya yang sesuai, dan periksa daun secara rutin.";
+      } else {
+        adviceBox.textContent =
+          "Daun diprediksi bergejala. Periksa bagian bawah daun, " +
+          "pastikan drainase baik, hindari penyiraman berlebihan, " +
+          "dan pisahkan tanaman bila dicurigai menular. " +
+          "Hasil AI belum memastikan penyebab gejala.";
+      }
+
+      statusBox.textContent = "Analisis selesai.";
+
+    } catch (error) {
+      console.error(error);
+      statusBox.textContent =
+        "Analisis gagal. Pastikan file model dan pustaka tersedia.";
+    } finally {
+      analyze.disabled = !model || !selectedImage;
+      analyze.textContent = "Analisis Daun";
+    }
+  });
+
+  // Daftarkan service worker untuk penyimpanan offline.
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", function () {
+      navigator.serviceWorker.register("./sw.js")
+        .catch(error => console.error(
+          "Service worker gagal didaftarkan:", error
+        ));
+    });
+  }
+
+  loadModel();
+</script>
+</body>
+</html>
